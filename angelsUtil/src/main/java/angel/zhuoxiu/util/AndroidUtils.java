@@ -1,12 +1,22 @@
 package angel.zhuoxiu.util;
 
+import android.app.Activity;
 import android.content.Context;
+import android.database.Cursor;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.net.Uri;
+import android.provider.MediaStore;
+import android.support.v4.content.CursorLoader;
+import android.text.format.DateUtils;
+import android.text.format.Time;
 import android.util.DisplayMetrics;
 import android.view.Display;
+import android.view.View;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 
+import java.io.File;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -43,6 +53,32 @@ public class AndroidUtils {
         return true;
     }
 
+
+    public static File parseFileByUri(Context context, Uri uri) {
+        File file = null;
+        try {
+            String[] projection = {MediaStore.Images.Media.DATA};
+            CursorLoader cursorLoader = new CursorLoader(context, uri, projection, null, null, null);
+            Cursor cursor = null;
+            try {
+                cursor = cursorLoader.loadInBackground();
+                int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
+                cursor.moveToFirst();
+                file = new File(cursor.getString(column_index));
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return file;
+    }
+
+
     /**
      * Judge if it is Tablet
      *
@@ -63,6 +99,7 @@ public class AndroidUtils {
         }
         return false;
     }
+
     public static boolean isInternetConnected(Context context) {
         return isMobileConnected(context) || isWifiConnected(context);
     }
@@ -82,5 +119,53 @@ public class AndroidUtils {
         ConnectivityManager connManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo.State wifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI).getState();
         return (wifi == NetworkInfo.State.CONNECTED || wifi == NetworkInfo.State.CONNECTING);
+    }
+
+    public static void showHideKeyboard(Activity activity, boolean show) {
+        InputMethodManager imm = (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+        View view = activity.getCurrentFocus();
+        if (view != null) {
+            if (show) {
+                imm.showSoftInput(view, 0);
+            } else {
+                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+            }
+        }
+    }
+
+    public static void toggleKeyboard(Activity activity) {
+        InputMethodManager imm = (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+        View view = activity.getCurrentFocus();
+        if (view != null) {
+            imm.toggleSoftInput(0, InputMethodManager.HIDE_NOT_ALWAYS);
+        }
+    }
+
+    public static String formatTimeStampString(Context context, long when, boolean fullFormat) {
+        Time then = new Time();
+        then.set(when);
+        Time now = new Time();
+        now.setToNow();
+        // Basic settings for formatDateTime() we want for all cases.
+        int format_flags = DateUtils.FORMAT_NO_NOON_MIDNIGHT |
+                DateUtils.FORMAT_ABBREV_ALL |
+                DateUtils.FORMAT_CAP_AMPM;
+        // If the message is from a different year, show the date and year.
+        if (then.year != now.year) {
+            format_flags |= DateUtils.FORMAT_SHOW_YEAR | DateUtils.FORMAT_SHOW_DATE;
+        } else if (then.yearDay != now.yearDay) {
+            // If it is from a different day than today, show only the date.
+            format_flags |= DateUtils.FORMAT_SHOW_DATE;
+        } else {
+            // Otherwise, if the message is from today, show the time.
+            format_flags |= DateUtils.FORMAT_SHOW_TIME;
+        }
+        // If the caller has asked for full details, make sure to show the date
+        // and time no matter what we've determined above (but still make showing
+        // the year only happen if it is a different year from today).
+        if (fullFormat) {
+            format_flags |= (DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_SHOW_TIME);
+        }
+        return DateUtils.formatDateTime(context, when, format_flags);
     }
 }
