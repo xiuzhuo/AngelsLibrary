@@ -2,12 +2,16 @@ package angel.zhuoxiu.util;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
+import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.database.Cursor;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
+import android.os.Build;
+import android.os.Environment;
 import android.provider.MediaStore;
-import android.support.v4.content.CursorLoader;
 import android.text.format.DateUtils;
 import android.text.format.Time;
 import android.util.DisplayMetrics;
@@ -17,6 +21,7 @@ import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 
 import java.io.File;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -54,28 +59,39 @@ public class AndroidUtils {
     }
 
 
-    public static File parseFileByUri(Context context, Uri uri) {
-        File file = null;
-        try {
-            String[] projection = {MediaStore.Images.Media.DATA};
-            CursorLoader cursorLoader = new CursorLoader(context, uri, projection, null, null, null);
-            Cursor cursor = null;
-            try {
-                cursor = cursorLoader.loadInBackground();
-                int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
-                cursor.moveToFirst();
-                file = new File(cursor.getString(column_index));
-            } catch (Exception e) {
-                e.printStackTrace();
-            } finally {
-                if (cursor != null) {
-                    cursor.close();
-                }
+    public static String parseFileByUri(Activity activity, Intent data) {
+        String filePath = null;
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            Uri u = data.getData();
+            //noinspection ResourceType
+            activity.getContentResolver().takePersistableUriPermission(u, flags);
+            String id = u.getLastPathSegment().split(":")[1];
+            final String[] imageColumns = {MediaStore.Images.Media.DATA};
+            final String imageOrderBy = null;
+            Uri u1 = null;
+            String state = Environment.getExternalStorageState();
+            if (!state.equalsIgnoreCase(Environment.MEDIA_MOUNTED))
+                u1 = MediaStore.Images.Media.INTERNAL_CONTENT_URI;
+            else
+                u1 = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+            Cursor c = activity.managedQuery(u1, imageColumns, MediaStore.Images.Media._ID + "=" + id, null, imageOrderBy);
+            if (c.moveToFirst()) {
+                filePath = c.getString(c.getColumnIndex(MediaStore.Images.Media.DATA));  //filePath represents string variable to hold the path of image
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } else {
+            Uri imgUri = data.getData();
+            Cursor c1 = activity.getContentResolver().query(imgUri, null, null, null, null);
+            if (c1 == null) {
+                filePath = imgUri.getPath();  //filePath represents string variable to hold the path of image
+            } else {
+                c1.moveToFirst();
+                int idx = c1.getColumnIndex(MediaStore.Images.ImageColumns.DATA);
+                filePath = c1.getString(idx);  //filePath represents string variable to hold the path of image
+                c1.close();
+            }
         }
-        return file;
+        return filePath;
     }
 
 
@@ -141,7 +157,7 @@ public class AndroidUtils {
         }
     }
 
-    public static String formatTimeStampString(Context context, long when, boolean fullFormat) {
+    public static CharSequence formatTimeStampString(Context context, long when, boolean fullFormat) {
         Time then = new Time();
         then.set(when);
         Time now = new Time();
@@ -155,10 +171,13 @@ public class AndroidUtils {
             format_flags |= DateUtils.FORMAT_SHOW_YEAR | DateUtils.FORMAT_SHOW_DATE;
         } else if (then.yearDay != now.yearDay) {
             // If it is from a different day than today, show only the date.
-            format_flags |= DateUtils.FORMAT_SHOW_DATE;
+            format_flags |= DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_SHOW_TIME;
         } else {
             // Otherwise, if the message is from today, show the time.
             format_flags |= DateUtils.FORMAT_SHOW_TIME;
+            format_flags = DateUtils.FORMAT_ABBREV_RELATIVE;
+            return DateUtils.getRelativeDateTimeString(context, when, DateUtils.MINUTE_IN_MILLIS, DateUtils.DAY_IN_MILLIS, 0);
+            //return DateUtils.getRelativeTimeSpanString(context,when,false);
         }
         // If the caller has asked for full details, make sure to show the date
         // and time no matter what we've determined above (but still make showing
@@ -167,5 +186,16 @@ public class AndroidUtils {
             format_flags |= (DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_SHOW_TIME);
         }
         return DateUtils.formatDateTime(context, when, format_flags);
+    }
+
+
+    public static void forceLocale(Context context, Locale locale) {
+        Configuration conf = context.getApplicationContext().getResources().getConfiguration();
+        conf.locale = locale;
+        context.getApplicationContext().getResources().updateConfiguration(conf, context.getApplicationContext().getResources().getDisplayMetrics());
+        Configuration systemConf = Resources.getSystem().getConfiguration();
+        systemConf.locale = locale;
+        Resources.getSystem().updateConfiguration(systemConf, Resources.getSystem().getDisplayMetrics());
+        Locale.setDefault(locale);
     }
 }
