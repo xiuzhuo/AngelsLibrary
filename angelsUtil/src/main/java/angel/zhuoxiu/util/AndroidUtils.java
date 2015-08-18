@@ -1,6 +1,7 @@
 package angel.zhuoxiu.util;
 
 import android.app.Activity;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
@@ -12,15 +13,12 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.provider.MediaStore;
-import android.text.format.DateUtils;
-import android.text.format.Time;
 import android.util.DisplayMetrics;
 import android.view.Display;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 
-import java.io.File;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -204,5 +202,15 @@ public class AndroidUtils {
         systemConf.locale = locale;
         Resources.getSystem().updateConfiguration(systemConf, Resources.getSystem().getDisplayMetrics());
         Locale.setDefault(locale);
+    }
+
+    public static void copyText(Context context, String content) {
+        ClipboardManager cmb = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+        cmb.setText(content.trim());
+    }
+
+    public static String pasteText(Context context) {
+        ClipboardManager cmb = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+        return cmb.getPrimaryClip() != null && cmb.getPrimaryClip().getItemCount() > 0 ? cmb.getPrimaryClip().getItemAt(0).getText().toString().trim() : null;
     }
 }
